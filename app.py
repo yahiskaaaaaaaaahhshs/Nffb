@@ -66,6 +66,15 @@ def process_card(ccx):
         response1 = requests.post('https://api.stripe.com/v1/payment_methods', headers=headers1, data=data1)
         response_data = response1.json()
         
+        # Check Stripe response for actual errors
+        if 'error' in response_data:
+            error_msg = response_data['error'].get('message', 'Card declined')
+            return {
+                "card": full_card,
+                "response": error_msg,
+                "status": "declined"
+            }
+            
         if 'id' not in response_data:
             return {
                 "card": full_card,
@@ -124,51 +133,79 @@ def process_card(ccx):
         
         result = response.json()
         
+        # Real response checking based on actual API response
+        if isinstance(result, dict):
+            # Check for success in actual response
+            if result.get('success') is True:
+                return {
+                    "card": full_card,
+                    "response": "Card Added Successfully",
+                    "status": "approved"
+                }
+            elif result.get('success') is False:
+                error_message = result.get('data', {}).get('message', 'Card declined')
+                return {
+                    "card": full_card,
+                    "response": error_message,
+                    "status": "declined"
+                }
+        
         # Convert the entire response to string for pattern matching
         response_str = str(result).lower()
         
-        # Check for various success indicators
+        # Real success indicators
         success_indicators = [
-            'succeded',
             'succeeded',
-            'true',
-            'card_added',
-            'setupintent',
-            'payment_method',
-            'active'
+            'success',
+            'active',
+            'setup_intent',
+            'payment_method'
         ]
         
-        # Check for any success indicator in the response
+        # Real decline indicators
+        decline_indicators = [
+            'declined',
+            'failed',
+            'error',
+            'invalid',
+            'incorrect',
+            'insufficient',
+            'expired'
+        ]
+        
+        # Check for actual success indicators
         if any(indicator in response_str for indicator in success_indicators):
             return {
                 "card": full_card,
                 "response": "Card Added Successfully",
                 "status": "approved"
             }
-        elif 'false' in response_str or 'declined' in response_str or 'fail' in response_str:
+        # Check for actual decline indicators
+        elif any(indicator in response_str for indicator in decline_indicators):
             return {
                 "card": full_card,
                 "response": "Your card was declined",
-                "status": "declined❌️"
+                "status": "declined"
             }
         else:
+            # If unclear, check payment method status
             return {
                 "card": full_card,
-                "response": "Card processing completed (verify manually)",
-                "status": "✅️approved✅️" if payment_id else "declined"
+                "response": "Card processing completed - check manually",
+                "status": "approved" if payment_id else "declined"
             }
             
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as e:
         return {
             "card": full_card if 'full_card' in locals() else ccx,
-            "response": "Processing completed (verify manually)",
-            "status": "approved"
+            "response": f"JSON Error: {str(e)}",
+            "status": "error"
         }
     except Exception as e:
         return {
             "card": full_card if 'full_card' in locals() else ccx,
-            "response": f"Processing completed (verify manually)",
-            "status": "approved"
+            "response": f"Processing error: {str(e)}",
+            "status": "error"
         }
 
 @app.route('/key=<key>/cc=<cc>')
@@ -188,7 +225,8 @@ def home():
         "message": "Card Checker API is running",
         "usage": "Use /key=OnyxEnv/cc=CARD_DETAILS to check cards",
         "format": "CARD_DETAILS format: NUMBER|MM|YY|CVC",
-        "example": "/key=OnyxEnv/cc=4111111111111111|12|25|123"
+        "example": "/key=OnyxEnv/cc=4111111111111111|12|25|123",
+        "note": "Now providing real response checking"
     })
 
 if __name__ == "__main__":
