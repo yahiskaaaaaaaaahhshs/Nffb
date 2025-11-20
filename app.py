@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify
 import time
 import requests
 import json
+import os
 
 app = Flask(__name__)
 
@@ -128,7 +129,7 @@ def process_card(ccx):
         
         # Check for various success indicators
         success_indicators = [
-            'succeded',  # Note: Typo from screenshot
+            'succeded',
             'succeeded',
             'true',
             'card_added',
@@ -144,7 +145,6 @@ def process_card(ccx):
                 "response": "Card Added Successfully",
                 "status": "approved"
             }
-        # Check for decline indicators
         elif 'false' in response_str or 'declined' in response_str or 'fail' in response_str:
             return {
                 "card": full_card,
@@ -152,8 +152,6 @@ def process_card(ccx):
                 "status": "declined❌️"
             }
         else:
-            # If we can't determine, check if the card was actually added
-            # You might want to add an additional check here to verify if card exists in account
             return {
                 "card": full_card,
                 "response": "Card processing completed (verify manually)",
@@ -164,13 +162,13 @@ def process_card(ccx):
         return {
             "card": full_card if 'full_card' in locals() else ccx,
             "response": "Processing completed (verify manually)",
-            "status": "approved"  # Default to approved if we can't parse response
+            "status": "approved"
         }
     except Exception as e:
         return {
             "card": full_card if 'full_card' in locals() else ccx,
             "response": f"Processing completed (verify manually)",
-            "status": "approved"  # Default to approved on errors
+            "status": "approved"
         }
 
 @app.route('/key=<key>/cc=<cc>')
@@ -188,9 +186,11 @@ def process_card_api(key, cc):
 def home():
     return jsonify({
         "message": "Card Checker API is running",
-        "usage": "Use /key=<API_KEY>/cc=<CARD_DETAILS> to check cards",
-        "format": "CARD_DETAILS format: NUMBER|MM|YY|CVC"
+        "usage": "Use /key=OnyxEnv/cc=CARD_DETAILS to check cards",
+        "format": "CARD_DETAILS format: NUMBER|MM|YY|CVC",
+        "example": "/key=OnyxEnv/cc=4111111111111111|12|25|123"
     })
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
